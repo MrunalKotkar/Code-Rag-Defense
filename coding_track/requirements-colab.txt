@@ -1,0 +1,18 @@
+# Week 1 packages for the Colab main notebook (installed by the setup cell).
+# torch, numpy and pyarrow come preinstalled on Colab and are not pinned here.
+#
+# Why transformers 4.x: mGTE (Alibaba-NLP/gte-multilingual-base) loads custom
+# model code written for transformers 4.39. Under transformers 5.x that code
+# builds garbage position ids and crashes (tested 2026-11-07 with 5.22.2:
+# "IndexError: index 6278202195968 is out of bounds"). With the pins below the
+# model reproduces the similarity scores printed on its model card exactly.
+# sentence-transformers 6.x requires transformers>=5, so it stays on 5.7.0;
+# transformers 4.57.6 requires huggingface-hub<1.0, so datasets stays on 5.0.1.
+transformers==4.57.6
+sentence-transformers==5.7.0
+huggingface-hub==0.36.2
+datasets==5.0.1
+chromadb==1.5.9
+beautifulsoup4==4.15.0
+datasketch==2.0.0
+ollama==0.6.3

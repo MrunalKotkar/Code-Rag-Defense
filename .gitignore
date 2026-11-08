@@ -1,0 +1,12 @@
+# Local test environment (Colab installs its own packages)
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Data never lives in the repo; it is on Google Drive (MyDrive/coding_track/)
+*.parquet
+*.npz
+*.zip
+chroma/
