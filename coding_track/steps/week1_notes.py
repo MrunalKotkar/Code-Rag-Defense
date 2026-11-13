@@ -123,6 +123,9 @@ def build_notes() -> str:
     lines += _section("Day 6 - Embedding time", load_stats("day6_embed"), _embed)
     lines += _section("Day 6 - ChromaDB", load_stats("day6_build_chroma"), _chroma)
     lines += _section("Day 7 - Checks", load_stats("day7_check_index"), _check)
+    lines += _section("Day 7 - Retrieval diagnostics", load_stats("day7_retrieval_diagnostics"),
+                      lambda s: [f"- {k}: {v}" for k, v in s.items()
+                                 if k not in ("step", "written_at")])
     return "\n".join(lines)
 
 
