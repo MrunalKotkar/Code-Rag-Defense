@@ -1,16 +1,16 @@
-Subject: Weekly update (Nov 9) - coding-docs track, Week 1 (data and index)
+Subject: Weekly update - coding-docs track, Week 1 complete (data and index)
 
 Dear Prof. Stamp,
 
 Here is my update on the coding-docs track. Week 1 builds the data and the
-search index. Most of it is done.
+search index. It is complete.
 
 ## 1. Status
 
 - Done: setup, downloads, question tagging, 80/20 split, target list, fresh
-  docs, Stack Overflow filter, cleaning, chunking, embedding.
-- Left this week: load the index into ChromaDB, then check it (count check,
-  20 sample questions, retrieval quality NDCG@10).
+  docs, Stack Overflow filter, cleaning, chunking, embedding, ChromaDB index,
+  and the checks.
+- The index count matches the chunk count exactly (1,812,241).
 - Everything runs on Colab. Data and results are on Google Drive. Code is on GitHub.
 
 ## 2. The dataset in short
@@ -89,6 +89,17 @@ Every question has a reference solution and unit tests.
 - Corpus: 1,207,822 documents and 1,812,241 chunks.
 - Embedding time: 4.56 hours on an L4, about 7.8 Colab units. The plan
   guessed 3 to 8 hours.
+- Building the ChromaDB index: 2.6 hours. The zipped index is 19.2 GB.
+
+Retrieval quality (NDCG@10, using CodeRAG-Bench's labelled correct docs):
+
+- Full index: DS-1000 0.001, ODEX 0.013. Close to zero.
+- Library docs only: DS-1000 0.20, ODEX 0.16.
+- Why the difference: the labelled correct docs are all library-documentation
+  pages. In the full index, about 94% of each top 10 are Stack Overflow posts,
+  so those posts push the labelled pages out.
+- The results are still on topic: in 20 sample test questions, on average
+  8.3 of the top 10 were about the right library.
 
 ## 4. Questions for you
 
@@ -102,6 +113,8 @@ Every question has a reference solution and unit tests.
    are also in our search corpus. For those questions the model can just
    copy the answer.
    - 107 such matches involve test questions (65 DS-1000, 42 ODEX).
+   - They do get retrieved: on average 0.4 (DS-1000) and 0.6 (ODEX) of each
+     question's top 10 are these flagged posts.
    - I can remove these posts without redoing the embedding.
    Should I remove them, or keep them because a real corpus would have them?
 
@@ -118,10 +131,14 @@ Every question has a reference solution and unit tests.
    The test set is still about 20%, but not exactly the counts in my plan.
    Is this okay? Switching to a plain per-question split is easy.
 
+5. Balance of the corpus.
+   Stack Overflow fills about 94% of the top-10 results. Half of the Stack
+   Overflow posts are random Python posts I added as background noise.
+   Is this balance fine, or should I use fewer background posts so the
+   documentation pages matter more?
+
 ## 5. Next steps
 
-- This week: build the ChromaDB index, check it, and record NDCG@10 on DS-1000
-  and ODEX.
 - Week 2: build the three test environments, check that the reference
   solutions pass, and run the clean baselines (no retrieval, and clean
   retrieval) for the local models and GPT-5.4 mini.
