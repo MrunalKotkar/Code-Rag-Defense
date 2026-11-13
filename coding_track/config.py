@@ -258,6 +258,42 @@ OLLAMA_CHECK_MODEL = "llama3.2:3b"
 OLLAMA_CHECK_PROMPT_TOKENS = 10_000
 
 # ---------------------------------------------------------------------------
+# Week 2: clean baseline
+# ---------------------------------------------------------------------------
+WEEK2_DIR = DRIVE_ROOT / "week2"
+RETRIEVAL_FILE = WEEK2_DIR / "retrieval_top40.jsonl"        # frozen ranking per question
+RETRIEVAL_CHUNKS_FILE = WEEK2_DIR / "retrieval_chunks.jsonl"  # text + metadata of those chunks
+PROMPTS_DIR = WEEK2_DIR / "prompts"                         # prompts_<setting>.jsonl
+GENERATIONS_DIR = WEEK2_DIR / "generations"                 # <model>__<setting>.jsonl
+OPENAI_BATCH_DIR = WEEK2_DIR / "openai_batch"
+TEST_EXPORT_FILE = WEEK2_DIR / "answers_for_tests.jsonl"    # upload this to the test runtime
+TEST_RESULTS_DIR = WEEK2_DIR / "test_results"               # put the test runtime's outputs here
+BASELINE_TABLE_FILE = WEEK2_DIR / "baseline_table.md"
+HANDCHECK_FILE = WEEK2_DIR / "handcheck_50.md"
+LOCAL_GENERATIONS_DIR = LOCAL_ROOT / "generations"
+
+RETRIEVAL_POOL = 40          # saved per question (Week 4's defense needs a pool of 40)
+SETTINGS = ("no_retrieval", "clean_rag")
+# Which questions are scored: test split, using an attacked or a control library.
+# "anchor" adds every DS-1000 and ODEX task for one Llama no-retrieval run that
+# is compared with CodeRAG-Bench's published no-retrieval numbers.
+QUESTION_SETS = ("scored", "anchor")
+BIGCODEBENCH_SPLIT = "instruct"   # ImportSnare does not say which; Instruct = natural-language task
+PILOT_N = 20
+COPY_TO_DRIVE_EVERY = 50
+HANDCHECK_N = 50
+
+LOCAL_MODELS = ("llama3.1:8b", "qwen2.5-coder:7b", "llama3.2:3b")   # run in this order
+OLLAMA_HOST = "http://localhost:11434"
+# Upper bound on answer length for every model (Ollama num_predict / OpenAI
+# max_completion_tokens). Answers that hit it are flagged as truncated.
+GEN_MAX_TOKENS = 2048
+
+OPENAI_MODEL = "gpt-5.4-mini"            # model page, checked 2026-11-13
+OPENAI_REASONING_EFFORT = "none"         # the model's default and lowest setting
+OPENAI_ENDPOINT = "/v1/chat/completions"
+
+# ---------------------------------------------------------------------------
 # Parallelism
 # ---------------------------------------------------------------------------
 NUM_PROC = max(1, (os.cpu_count() or 2) - 1)

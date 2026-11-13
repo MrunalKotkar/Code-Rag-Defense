@@ -73,6 +73,61 @@ coding_track/
 | `stats/*.json` | every step | the real numbers |
 | `notes/week1_numbers.md` | day7 / week1_notes | the notes file with all real numbers |
 
+## Week 2: clean baseline
+
+Two Colab notebooks, on purpose:
+
+| Notebook | Runtime | Has | Runs |
+|---|---|---|---|
+| `notebooks/week2_main_colab.ipynb` | L4 GPU (CPU for scoring) | Drive, OpenAI key | retrieval freeze, prompts, Ollama + GPT runs, export, scoring |
+| `notebooks/week2_tests_colab.ipynb` | CPU | **no Drive, no keys** (network on) | the three test environments, DS-1000 Codex check, reference solutions, answer tests, Bandit |
+
+Files moved between them by download/upload: `answers_for_tests.jsonl` (main -> test)
+and `test_outputs.zip` (test -> main, unzipped into `week2/test_results/`).
+
+New code:
+```
+common/prompt.py          ImportSnare A.4 prompt (verbatim) + "Return only code, in one python block."
+common/answers.py         code-block extraction, ast import reader (regex fallback), pip-install finder
+common/question_sets.py   scored set (test split, attacked/control library) and anchor set
+common/generation.py      one saved line per answer; resume + copy to Drive every 50
+steps/w2_freeze_retrieval.py   top-40 chunks per scored question, frozen to a file
+steps/w2_build_prompts.py      every prompt built once (no_retrieval, clean_rag)
+steps/w2_generate_ollama.py    one local model at a time (temp 0, seed 100, num_ctx 16384)
+steps/w2_openai_batch.py       GPT-5.4 mini: probe, submit, status, collect (Batch API)
+steps/w2_export_for_tests.py   answers -> test notebook
+steps/w2_score.py              baseline table + the three pre-Week-3 checks
+steps/w2_handcheck.py          50 random answers for a manual check
+testing/env_spec.py       pinned environments, each pin with its source
+testing/build_envs.py     uv venvs (Python 3.10) + pip installs, pip freeze saved
+testing/exec_program.py   runs one test program in a fresh process
+testing/harness.py        DS-1000 / ODEX programs, BigCodeBench official evaluator
+testing/run_tests.py      modes: codex, reference, answers
+```
+
+Week 2 outputs on Drive (`MyDrive/coding_track/week2/`): `retrieval_top40.jsonl`,
+`retrieval_chunks.jsonl`, `prompts/`, `generations/`, `openai_batch/`,
+`answers_for_tests.jsonl`, `test_results/`, `baseline_table.md`, `handcheck_50.md`.
+
+Week 2 decisions (and why):
+* **Prompt:** ImportSnare Appendix A.4, word for word (the paper's "don´t" typesetting artifact
+  written as "don't"), plus the one line "Return only code, in one python block.".
+  The same template is used with an empty context for no retrieval.
+* **BigCodeBench Instruct split.** ImportSnare does not say which split it used.
+* **ODEX prompt** follows ODEX's own nl2code format (header, intent docstring, body prefix).
+  ODEX scoring runs **all** test cases (ODEX's script samples one); a full-function answer
+  is used as is, otherwise it is treated as a completion (prompt + answer + suffix).
+* **DS-1000** scoring copies DS-1000's test_ds1000.py program and its 120 s time limit.
+  **BigCodeBench** uses its official evaluator (`bigcodebench.evaluate`, local, calibrated).
+* **Scored set:** test-split questions using an attacked or control library (364:
+  DS-1000 199, BigCodeBench 148, ODEX 17). The optional **anchor** run (Llama 3.1 8B,
+  no retrieval, all DS-1000 + ODEX) is only for comparing with CodeRAG-Bench Table 5
+  (Llama3-8B w/o: DS-1000 28.9, ODEX 37.4).
+* **GPT-5.4 mini parameters are probed, not assumed**: temperature 0, seed 100 and
+  reasoning effort "none" are sent; anything the API rejects is dropped and recorded.
+* **setuptools<82** in every test environment (82.0.0 removed pkg_resources; the
+  benchmark environments predate it; ODEX's obspy needs it).
+
 ## Testing on the laptop
 
 ```

@@ -16,3 +16,5 @@ chromadb==1.5.9
 beautifulsoup4==4.15.0
 datasketch==2.0.0
 ollama==0.6.3
+# Week 2: GPT-5.4 mini via the Batch API (main notebook only, key from Colab Secrets)
+openai==3.40.0
