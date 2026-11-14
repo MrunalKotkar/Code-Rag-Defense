@@ -13,11 +13,17 @@ Modes:
              main notebook) and run Bandit on every answer.
 
 Outputs go to /content/test_outputs/ (download them and put them in
-MyDrive/coding_track/week2/test_results/).
+MyDrive/coding_track/week2/test_results/). That folder is lost when the Colab
+session ends, so the notebook downloads a zip after every step.
 
 Usage:  python -m coding_track.testing.run_tests codex
-        python -m coding_track.testing.run_tests reference
+        python -m coding_track.testing.run_tests reference --datasets ds1000
+        python -m coding_track.testing.run_tests reference --datasets odex
+        python -m coding_track.testing.run_tests reference --datasets bigcodebench
         python -m coding_track.testing.run_tests answers --input answers_for_tests.jsonl
+
+reference saves after each dataset: results for other datasets already in
+reference_results.jsonl are kept, only the dataset just run is replaced.
 """
 
 from __future__ import annotations
@@ -97,44 +103,67 @@ BCB_CANONICAL_SCRIPT = (
     "json.dump({k:v['code_prompt']+v['canonical_solution'] for k,v in d.items()},open(sys.argv[1],'w'))\n")
 
 
+def reference_ds1000(workers: int | None) -> list[dict]:
+    problems = harness.ds1000_problems()
+    jobs = [(pid, harness.ds1000_program(p, p["reference_code"])) for pid, p in problems.items()]
+    print(f"DS-1000 reference solutions: {len(jobs)}")
+    return [{"dataset": "ds1000", "native_id": pid, **res}
+            for pid, res in harness.run_many(jobs, env_spec.env_python("ds1000"),
+                                             env_spec.DS1000_TIMEOUT_S, workers).items()]
+
+
+def reference_odex(workers: int | None) -> list[dict]:
+    problems = harness.odex_problems()
+    jobs = [(nid, harness.odex_program(p, p["canonical_solution"], is_reference=True))
+            for nid, p in problems.items()]
+    print(f"ODEX reference solutions: {len(jobs)}")
+    return [{"dataset": "odex", "native_id": nid, **res}
+            for nid, res in harness.run_many(jobs, env_spec.env_python("odex"),
+                                             env_spec.ODEX_TIMEOUT_S, workers).items()]
+
+
+def reference_bigcodebench() -> list[dict]:
+    # A fresh ground-truth timing cache for the full set (the evaluator caches by dataset hash).
+    for pkl in harness.bigcodebench_cache_dir().glob("*.pkl"):
+        pkl.unlink()
+    with tempfile.TemporaryDirectory() as tmp:
+        canon = Path(tmp) / "canonical.json"
+        subprocess.run([str(env_spec.env_python("bcb")), "-c", BCB_CANONICAL_SCRIPT, str(canon)],
+                       check=True)
+        solutions = json.loads(canon.read_text())
+        print(f"BigCodeBench reference solutions: {len(solutions)}")
+        return [{"dataset": "bigcodebench", "native_id": tid, "status": res["status"],
+                 "error": res["error"]}
+                for tid, res in harness.run_bigcodebench(solutions, Path(tmp) / "bcb").items()]
+
+
+def save_reference(ds: str, new_rows: list[dict]) -> None:
+    """Replace this dataset's rows in reference_results.jsonl, keep the other datasets' rows.
+
+    Saving after each dataset means a crash or disconnect later on does not lose
+    the datasets that already finished.
+    """
+    path = OUT / "reference_results.jsonl"
+    kept = []
+    if path.exists():
+        kept = [r for r in (json.loads(l) for l in open(path, encoding="utf-8") if l.strip())
+                if r["dataset"] != ds]
+    write_jsonl(path, kept + new_rows)
+
+
 def mode_reference(workers: int | None, datasets: list[str]) -> None:
-    rows = []
-    if "ds1000" in datasets:
-        problems = harness.ds1000_problems()
-        jobs = [(pid, harness.ds1000_program(p, p["reference_code"])) for pid, p in problems.items()]
-        print(f"DS-1000 reference solutions: {len(jobs)}")
-        for pid, res in harness.run_many(jobs, env_spec.env_python("ds1000"),
-                                         env_spec.DS1000_TIMEOUT_S, workers).items():
-            rows.append({"dataset": "ds1000", "native_id": pid, **res})
-    if "odex" in datasets:
-        problems = harness.odex_problems()
-        jobs = [(nid, harness.odex_program(p, p["canonical_solution"], is_reference=True))
-                for nid, p in problems.items()]
-        print(f"ODEX reference solutions: {len(jobs)}")
-        for nid, res in harness.run_many(jobs, env_spec.env_python("odex"),
-                                         env_spec.ODEX_TIMEOUT_S, workers).items():
-            rows.append({"dataset": "odex", "native_id": nid, **res})
-    if "bigcodebench" in datasets:
-        # A fresh ground-truth timing cache for the full set (the evaluator caches by dataset hash).
-        for pkl in harness.bigcodebench_cache_dir().glob("*.pkl"):
-            pkl.unlink()
-        with tempfile.TemporaryDirectory() as tmp:
-            canon = Path(tmp) / "canonical.json"
-            subprocess.run([str(env_spec.env_python("bcb")), "-c", BCB_CANONICAL_SCRIPT, str(canon)],
-                           check=True)
-            solutions = json.loads(canon.read_text())
-            print(f"BigCodeBench reference solutions: {len(solutions)}")
-            for tid, res in harness.run_bigcodebench(solutions, Path(tmp) / "bcb").items():
-                rows.append({"dataset": "bigcodebench", "native_id": tid, "status": res["status"],
-                             "error": res["error"]})
-    write_jsonl(OUT / "reference_results.jsonl", rows)
+    runners = {"ds1000": lambda: reference_ds1000(workers),
+               "odex": lambda: reference_odex(workers),
+               "bigcodebench": reference_bigcodebench}
     for ds in datasets:
-        mine = [r for r in rows if r["dataset"] == ds]
-        failed = [r for r in mine if r["status"] != "pass"]
-        print(f"\n{ds}: {len(mine) - len(failed)}/{len(mine)} reference solutions pass "
-              f"({(len(mine) - len(failed)) / max(1, len(mine)):.1%})")
+        rows = runners[ds]()
+        save_reference(ds, rows)
+        failed = [r for r in rows if r["status"] != "pass"]
+        print(f"\n{ds}: {len(rows) - len(failed)}/{len(rows)} reference solutions pass "
+              f"({(len(rows) - len(failed)) / max(1, len(rows)):.1%})")
         for r in failed:
             print(f"  FAIL {r['native_id']}: {r['status']} {r['error'][:160]}")
+        print()
 
 
 # ---------------------------------------------------------------------------

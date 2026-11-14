@@ -84,6 +84,9 @@ Two Colab notebooks, on purpose:
 
 Files moved between them by download/upload: `answers_for_tests.jsonl` (main -> test)
 and `test_outputs.zip` (test -> main, unzipped into `week2/test_results/`).
+The test notebook has no Drive, so every check cell downloads `test_outputs.zip` with all
+results so far; after a disconnect, rebuild the environments and restore the newest zip.
+`run_tests reference` runs one dataset per cell and saves after each one.
 
 New code:
 ```

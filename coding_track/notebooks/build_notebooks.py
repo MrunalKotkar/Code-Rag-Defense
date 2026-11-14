@@ -179,12 +179,17 @@ Run the setup cell first in every session. Every run resumes where it stopped.
         code("!python -m coding_track.steps.w2_export_for_tests\n"
              "from google.colab import files\n"
              "files.download('/content/drive/MyDrive/coding_track/week2/answers_for_tests.jsonl')"),
-        md("## Day 7 - After the test notebook: put its files into Drive `coding_track/week2/test_results/` "
-           "(upload cell below), then score"),
+        md("## Day 7 - After the test notebook: upload its newest `test_outputs.zip` "
+           "(it is unzipped into Drive `coding_track/week2/test_results/`), then score"),
         code("import os, shutil\nfrom google.colab import files\n"
              "dst = '/content/drive/MyDrive/coding_track/week2/test_results'\nos.makedirs(dst, exist_ok=True)\n"
-             "for name in files.upload():\n    shutil.move(name, os.path.join(dst, name))\n"
-             "print(os.listdir(dst))"),
+             "for name in files.upload():\n"
+             "    if name.endswith('.zip'):\n"
+             "        shutil.unpack_archive(name, dst, 'zip')\n"
+             "        os.remove(name)\n"
+             "    else:\n"
+             "        shutil.move(name, os.path.join(dst, name))\n"
+             "print(sorted(os.listdir(dst)))"),
         code("!python -m coding_track.steps.w2_score"),
         code("!python -m coding_track.steps.w2_handcheck"),
     ]
@@ -196,36 +201,58 @@ def week2_tests() -> list[dict]:
         md("""
 # Coding-docs RAG poisoning - Week 2 TEST notebook
 
-**Runtime: CPU. Do NOT mount Drive. Do NOT add API keys.** Network stays on
-(some BigCodeBench tests use it). This machine only runs code and gives back pass/fail.
+**Runtime: CPU (High-RAM if you have it). Do NOT mount Drive. Do NOT add API keys.**
+Network stays on (some BigCodeBench tests use it). This machine only runs code and
+gives back pass/fail.
 
-Order: setup -> build environments -> DS-1000 Codex check -> reference solutions ->
-upload answers -> score them -> download the results zip.
-Environments are lost when the session ends; re-run "build environments" in a new session.
+Order: setup -> build environments -> (new session only: restore) -> DS-1000 Codex check ->
+reference solutions, one dataset per cell -> upload answers -> score them.
+
+Everything in this session (environments and `/content/test_outputs`) is lost when the
+session ends. So every check cell ends by downloading `test_outputs.zip` with **all**
+results so far. Keep the newest zip. In a new session: setup, build environments, then
+the restore cell with that zip, and continue where you stopped.
 """),
         code(f'''
 REPO_URL = "{REPO_URL}"
-import os, subprocess
+import os, shutil, subprocess
+from google.colab import files
 if not os.path.isdir("/content/repo"):
     subprocess.run(["git", "clone", REPO_URL, "/content/repo"], check=True)
 else:
     subprocess.run(["git", "-C", "/content/repo", "pull", "--ff-only"], check=True)
 os.chdir("/content/repo")
+OUTPUTS = "/content/test_outputs"
+
+def save_outputs():
+    """Download everything in /content/test_outputs as one zip (all results so far)."""
+    if not os.path.isdir(OUTPUTS) or not os.listdir(OUTPUTS):
+        print("nothing to save yet")
+        return
+    shutil.make_archive("/content/test_outputs", "zip", OUTPUTS)
+    print("saving:", sorted(os.listdir(OUTPUTS)))
+    files.download("/content/test_outputs.zip")
+
 print("ready")
 '''),
         md("## Day 1-2 - Build the three environments (Python 3.10 each; takes a while)"),
         code("!python -m coding_track.testing.build_envs ds1000 bcb odex"),
+        md("## New session only - restore the newest `test_outputs.zip` you downloaded\n"
+           "Skip this in the first session."),
+        code("uploaded = list(files.upload())\n"
+             "shutil.unpack_archive(uploaded[0], OUTPUTS, 'zip')\n"
+             "print(sorted(os.listdir(OUTPUTS)))"),
         md("## Day 1 - DS-1000 check: reproduce Codex-002 (expected overall 0.388)"),
-        code(f"{run} codex"),
-        md("## Day 2 - Official reference solutions (DS-1000, ODEX, BigCodeBench)"),
-        code(f"{run} reference"),
+        code(f"{run} codex\nsave_outputs()"),
+        md("## Day 2 - Official reference solutions, one dataset per cell\n"
+           "Each cell adds its dataset to `reference_results.jsonl` (the others are kept) "
+           "and downloads the zip."),
+        code(f"{run} reference --datasets ds1000\nsave_outputs()"),
+        code(f"{run} reference --datasets odex\nsave_outputs()"),
+        code(f"{run} reference --datasets bigcodebench\nsave_outputs()"),
         md("## Pilot / full scoring - upload the answers file exported by the main notebook"),
-        code("from google.colab import files\nuploaded = list(files.upload())\nprint(uploaded)"),
-        code(f"{run} answers --input {{uploaded[0]}}"),
-        md("## Download everything in /content/test_outputs as one zip"),
-        code("import shutil\nfrom google.colab import files\n"
-             "shutil.make_archive('/content/test_outputs', 'zip', '/content/test_outputs')\n"
-             "files.download('/content/test_outputs.zip')"),
+        code("uploaded = list(files.upload())\nprint(uploaded)"),
+        code(f"{run} answers --input {{uploaded[0]}}\nsave_outputs()"),
     ]
 
 
