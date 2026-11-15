@@ -128,6 +128,20 @@ Week 2 decisions (and why):
   (Llama3-8B w/o: DS-1000 28.9, ODEX 37.4).
 * **GPT-5.4 mini parameters are probed, not assumed**: temperature 0, seed 100 and
   reasoning effort "none" are sent; anything the API rejects is dropped and recorded.
+* **PyYAML 6.0.1 in the DS-1000 environment.** DS-1000's conda environment gets PyYAML
+  through conda's pytorch package; the pip torch wheel does not. Problem 15's test imports yaml.
+* **Every test command runs in its own process group, killed when it ends.** Some BigCodeBench
+  tests leave background processes; on Colab one kept the notebook cell open for hours after
+  the results were written. Leftovers are now killed and can never hold the notebook's output.
+* **A test that times out in parallel is run once more alone** (same time limit, same program).
+  On Colab, DS-1000 837/838 (xgboost) timed out at 120 s in parallel but take 3-5 s alone.
+* **Reference failures that remain** are left out of pass@1 and counted in the table
+  (Colab: DS-1000 15/837/838 before the two fixes above; ODEX 8: three `urllib` tasks that never
+  import `urllib.request`, three that expect matplotlib's old `AxesSubplot` class name, one that
+  uses `scipy.tensordot`, and the sqlalchemy 1.3.5 vs pandas conflict; BigCodeBench 8 of 1140:
+  205/363 timeouts, 590/1005 websites answering 403 to Colab, 812/832 permission tests that
+  cannot fail as root, 288/350 expect a "non-existent" folder to be missing but passed in the
+  evaluator's own first run). None are in the scored set.
 * **setuptools<82** in every test environment (82.0.0 removed pkg_resources; the
   benchmark environments predate it; ODEX's obspy needs it).
 

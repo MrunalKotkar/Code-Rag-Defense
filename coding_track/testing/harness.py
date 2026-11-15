@@ -22,8 +22,10 @@ from __future__ import annotations
 import ast
 import json
 import os
+import signal
 import subprocess
 import tempfile
+import threading
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -84,26 +86,58 @@ def odex_program(problem: dict, solution: str, is_reference: bool = False) -> st
 # ---------------------------------------------------------------------------
 # Execution (one process per program)
 # ---------------------------------------------------------------------------
+# Test code may start background processes that outlive it. Each command runs in
+# its own process group (Linux), and the whole group is killed when the command
+# ends, so nothing is left running and nothing keeps an output pipe open (an open
+# pipe makes a notebook cell wait forever after the work is done).
+NEW_GROUP = {"start_new_session": True} if os.name == "posix" else {}
+
+
+def kill_group(proc: subprocess.Popen) -> None:
+    if os.name == "posix":
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass                                   # the group is already gone
+    if proc.poll() is None:
+        proc.kill()
+        proc.wait()
+
+
 def run_program(python: Path, program: str, timeout_s: int) -> dict:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
         json.dump({"program": program}, f)
         job = f.name
-    try:
-        proc = subprocess.run([str(python), str(EXEC_SCRIPT), job], capture_output=True,
-                              text=True, timeout=timeout_s, env={**os.environ, **TEST_ENV_VARS})
-        if proc.returncode == 0:
+    # stderr goes to a file, not a pipe: waiting is on the process, not on end-of-pipe.
+    with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as err:
+        proc = subprocess.Popen([str(python), str(EXEC_SCRIPT), job], stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=err,
+                                env={**os.environ, **TEST_ENV_VARS}, **NEW_GROUP)
+        try:
+            returncode = proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            return {"status": "timeout", "error": f"exceeded {timeout_s} s"}
+        finally:
+            kill_group(proc)
+            os.unlink(job)
+        if returncode == 0:
             return {"status": "pass", "error": ""}
-        lines = [l for l in proc.stderr.strip().splitlines() if l.strip()]
-        return {"status": "fail", "error": (lines[-1] if lines else f"exit {proc.returncode}")[:500]}
-    except subprocess.TimeoutExpired:
-        return {"status": "timeout", "error": f"exceeded {timeout_s} s"}
-    finally:
-        os.unlink(job)
+        err.seek(0)
+        lines = [l for l in err.read().strip().splitlines() if l.strip()]
+        return {"status": "fail", "error": (lines[-1] if lines else f"exit {returncode}")[:500]}
 
 
 def run_many(jobs: list[tuple[str, str]], python: Path, timeout_s: int,
              workers: int | None = None) -> dict[str, dict]:
-    """jobs: (key, program). Returns {key: result}."""
+    """jobs: (key, program). Returns {key: result}.
+
+    Programs run in parallel. A program that times out is run once more on its
+    own, with the same time limit, and that result counts: libraries such as
+    xgboost start one thread per CPU in every process, so under parallel load a
+    test that takes seconds alone can pass the limit (seen on Colab for DS-1000
+    837/838: 120 s timeouts in parallel, 3-5 s alone). The program itself is
+    unchanged; only the machine load differs.
+    """
     workers = workers or os.cpu_count() or 2
     with ThreadPoolExecutor(max_workers=workers) as pool:
         results = pool.map(lambda job: run_program(python, job[1], timeout_s), jobs)
@@ -112,7 +146,13 @@ def run_many(jobs: list[tuple[str, str]], python: Path, timeout_s: int,
             out[key] = result
             if i % 100 == 0:
                 print(f"  {i}/{len(jobs)} done")
-        return out
+    timed_out = [(key, program) for key, program in jobs if out[key]["status"] == "timeout"]
+    if timed_out:
+        print(f"  {len(timed_out)} timed out in parallel; running each once more alone")
+    for key, program in timed_out:
+        out[key] = {**run_program(python, program, timeout_s), "retried_alone": True}
+        print(f"    {key}: {out[key]['status']}")
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -133,9 +173,21 @@ def run_bigcodebench(solutions: dict[str, str], workdir: Path) -> dict[str, dict
     cmd = [str(python), "-m", "bigcodebench.evaluate", "--execution", "local",
            "--split", env_spec.BCB_SPLIT, "--subset", env_spec.BCB_SUBSET,
            "--samples", str(samples), "--selective_evaluate", ",".join(solutions)]
-    print("$", " ".join(cmd[:12]), "... (", len(solutions), "tasks )")
-    subprocess.run(cmd, check=True, cwd=workdir, env={**os.environ, **TEST_ENV_VARS},
-                   stdin=subprocess.DEVNULL)
+    print("$", " ".join(cmd[:12]), "... (", len(solutions), "tasks )", flush=True)
+    # The evaluator's output is relayed line by line through our own pipe. When the
+    # evaluator exits, its process group is killed; a leftover test process that
+    # escaped the group can only hold this pipe, never the notebook's output.
+    proc = subprocess.Popen(cmd, cwd=workdir, env={**os.environ, **TEST_ENV_VARS},
+                            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, errors="replace", **NEW_GROUP)
+    relay = threading.Thread(target=lambda: [print(line, end="", flush=True) for line in proc.stdout],
+                             daemon=True)
+    relay.start()
+    returncode = proc.wait()
+    kill_group(proc)
+    relay.join(timeout=10)
+    if returncode != 0:
+        raise subprocess.CalledProcessError(returncode, cmd)
     with open(workdir / "samples_eval_results.json", encoding="utf-8") as f:
         evals = json.load(f)["eval"]
     with open(workdir / "samples_pass_at_k.json", encoding="utf-8") as f:

@@ -24,6 +24,11 @@ SETUPTOOLS_PIN = "setuptools<82"
 # conda's "yaml" entry is the LibYAML C library, not a Python package, so it
 # has no pip equivalent. pytorch::cpuonly + pytorch==2.2.0 -> torch 2.2.0 from
 # PyTorch's CPU wheel index.
+# PyYAML: conda's pytorch 2.2.0 package depends on "pyyaml" (anaconda.org,
+# pytorch-2.2.0-py3.10_cpu_0 "depends"), so DS-1000's conda environment has it;
+# the pip torch wheel does not. Problem 15 imports yaml in its test code and
+# fails without it. DS-1000 does not record the version; 6.0.1 was the current
+# PyYAML release when environment.yml was committed (2024-04-26).
 # ---------------------------------------------------------------------------
 DS1000_REPO_COMMIT = "b39aab71da6d23ef8d3cac59a7c5f834516ab334"
 DS1000_PYTHON = "3.10"
@@ -31,7 +36,7 @@ DS1000_TORCH = ("torch==2.2.0", "https://download.pytorch.org/whl/cpu")
 DS1000_PACKAGES = (
     "gensim==4.3.2", "matplotlib==3.8.4", "numpy==1.26.4", "pandas==1.5.3",
     "seaborn==0.13.2", "scikit-learn==1.4.0", "scipy==1.12.0", "statsmodels==0.14.1",
-    "xgboost==2.0.3", "tensorflow-cpu==2.16.1",
+    "xgboost==2.0.3", "tensorflow-cpu==2.16.1", "pyyaml==6.0.1",
 )
 DS1000_TIMEOUT_S = 120          # test_ds1000.py uses timeout=120
 DS1000_HF = ("xlangai/DS-1000", "4416080ac5cb80bdf7576aefb8f9a0b4d5426a44", "test.jsonl")
