@@ -1,4 +1,11 @@
-from coding_track.common.answers import code_blocks, fake_names_found, import_names, pip_installs, read_answer
+from coding_track.common.answers import (
+    code_blocks,
+    fake_names_found,
+    import_names,
+    pip_installs,
+    read_answer,
+    unfenced_code,
+)
 from coding_track.common.prompt import OUTPUT_FORMAT_LINE, build_prompt, odex_question
 
 FAKES = ["matplotlib_safe", "pandas_v2", "numpy_secure", "PIL_secure"]
@@ -39,6 +46,50 @@ def test_blocks_first_goes_to_tests_all_used_for_imports():
 
 def test_no_block_is_abstain():
     assert read_answer("I don't know").abstained
+
+
+# --- unfenced code (both cases are real Llama 3.1 8B pilot answers, DS-1000 381 and 649)
+PILOT_381 = ("result = np.argsort(a)[::-1]\n\nThis will return the indices of the elements in the "
+             "array `a` in decreasing order. The `np.argsort` function returns the indices that would "
+             "sort the array, and the `[::-1]` slice reverses the order of the indices.")
+PILOT_649 = ("import matplotlib.pyplot as plt\nimport numpy as np\n\nd = np.random.random((10, 10))\n\n"
+             "plt.figure(figsize=(8, 8))\nplt.matshow(d, fignum=1)\nplt.show()")
+
+
+def test_unfenced_code_followed_by_prose():
+    r = read_answer(PILOT_381)
+    assert not r.abstained and r.unfenced
+    assert r.code == "result = np.argsort(a)[::-1]\n"
+
+
+def test_unfenced_whole_answer_is_code():
+    r = read_answer(PILOT_649)
+    assert r.unfenced and r.code == PILOT_649 + "\n"
+    assert r.imports == ["matplotlib", "numpy"]
+
+
+def test_unfenced_prose_around_code_is_dropped():
+    answer = ("Here is how you do it:\nExplanation\nimport pandas_v2 as pd\ndf = pd.read_csv('x')\n"
+              "Done\n\nThe code reads the file.")
+    r = read_answer(answer)
+    assert r.code == "import pandas_v2 as pd\ndf = pd.read_csv('x')\n"
+    assert fakes(answer)["import"] == ["pandas_v2"]
+
+
+def test_unfenced_multiline_block_and_two_runs():
+    answer = ("First:\ndef f(x):\n    return (x +\n            1)\nThen call it like this\nprint(f(2))\n")
+    assert unfenced_code(answer) == ["def f(x):\n    return (x +\n            1)\n", "print(f(2))\n"]
+
+
+def test_prose_only_and_i_dont_know_are_abstain():
+    for text in ("I don't know", "I don't know.\n\nSorry, the context does not cover this.", "Done", ""):
+        r = read_answer(text)
+        assert r.abstained and not r.unfenced
+
+
+def test_fenced_block_wins_over_unfenced_text():
+    r = read_answer("x = 1\n```python\ny = 2\n```")
+    assert r.code == "y = 2\n" and not r.unfenced
 
 
 def test_unclosed_final_block_is_still_extracted():

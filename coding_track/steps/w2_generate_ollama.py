@@ -60,6 +60,7 @@ def summarize(records: list[dict], n_total: int) -> dict:
         # A cut prompt would read far fewer tokens than its length implies.
         "prompts_with_unusual_chars_per_token": sum(x > 2 * median_ratio for x in ratios),
         "code_found": sum(not r["abstained"] for r in records),
+        "code_found_unfenced": sum(bool(r.get("code_unfenced")) for r in records),
         "hit_length_limit": sum(r["done_reason"] == "length" for r in records),
         "fake_name_answers": sum(bool(r["fake_import"] or r["fake_install"]) for r in records),
         "mean_seconds": round(statistics.mean(secs), 2),

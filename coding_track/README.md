@@ -116,6 +116,10 @@ Week 2 decisions (and why):
 * **Prompt:** ImportSnare Appendix A.4, word for word (the paper's "don´t" typesetting artifact
   written as "don't"), plus the one line "Return only code, in one python block.".
   The same template is used with an empty context for no retrieval.
+* **Unfenced code counts as code.** In the pilot, Llama 3.1 8B answered 2 of 20 questions
+  with plain code and no ``` fence. With no fenced Python block, the reader takes the runs of
+  lines that Python parses (bare words/strings at their edges dropped) and marks the record
+  `code_unfenced`; the generation summary prints `code_found_unfenced`.
 * **BigCodeBench Instruct split.** ImportSnare does not say which split it used.
 * **ODEX prompt** follows ODEX's own nl2code format (header, intent docstring, body prefix).
   ODEX scoring runs **all** test cases (ODEX's script samples one); a full-function answer

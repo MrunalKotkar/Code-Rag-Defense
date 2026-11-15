@@ -54,6 +54,7 @@ def make_record(prompt_row: dict, *, model: str, model_id: str, setting: str, ra
         "raw_answer": raw_answer, "code": reading.code, "n_blocks": len(reading.blocks),
         "all_code": "\n\n".join(reading.blocks), "imports": reading.imports,
         "pip_installs": reading.pip_installs, "unparsable_blocks": reading.unparsable_blocks,
-        "abstained": reading.abstained, "fake_import": found["import"], "fake_install": found["install"],
+        "abstained": reading.abstained, "code_unfenced": reading.unfenced,
+        "fake_import": found["import"], "fake_install": found["install"],
         "created_at": now_iso(),
     }

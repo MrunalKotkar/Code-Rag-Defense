@@ -145,6 +145,7 @@ def cmd_collect(setting: str) -> None:
         "failures": failed[:20], "params": info["params"],
         "hit_length_limit": sum(r["done_reason"] == "length" for r in records),
         "code_found": sum(not r["abstained"] for r in records),
+        "code_found_unfenced": sum(bool(r.get("code_unfenced")) for r in records),
         "prompt_tokens": sum(r["prompt_eval_count"] for r in records),
         "completion_tokens": sum(r["eval_count"] for r in records)})
 
