@@ -47,9 +47,22 @@ OLLAMA_MODELS = {models!r}
 import os, subprocess, time
 from google.colab import drive
 
-def sh(cmd):
-    print("$", cmd)
-    subprocess.run(cmd, shell=True, check=True)
+def sh(cmd, tries=1):
+    """Run a shell command; print the end of its output (Colab hides it otherwise).
+    Network steps get tries=3: a dropped download is retried, a real error still stops."""
+    print("$", cmd, flush=True)
+    for attempt in range(1, tries + 1):
+        proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, errors="replace")
+        lines = (proc.stdout + proc.stderr).replace("\\r", "\\n").splitlines()
+        tail = [l for l in lines if l.strip()][-15:]
+        if tail:
+            print("\\n".join(tail))
+        if proc.returncode == 0:
+            return
+        print(f"!! exit status {{proc.returncode}} (try {{attempt}} of {{tries}})", flush=True)
+        if attempt < tries:
+            time.sleep(15)
+    raise RuntimeError(f"command failed: {{cmd}}")
 
 if "<" in REPO_URL:
     raise SystemExit("Set REPO_URL (first line of this cell) to your GitHub repo's HTTPS URL, then re-run.")
@@ -64,13 +77,13 @@ sh("pip install -q -r coding_track/requirements-colab.txt")
 
 if NEED_OLLAMA:
     sh("apt-get -qq install -y pciutils zstd > /dev/null")   # pciutils helps Ollama find a GPU
-    sh("curl -fsSL https://ollama.com/install.sh | sh")
+    sh("curl -fsSL https://ollama.com/install.sh | sh", tries=3)
     env = dict(os.environ, OLLAMA_CONTEXT_LENGTH="16384")
     subprocess.Popen(["ollama", "serve"], env=env,
                      stdout=open("/content/ollama.log", "w"), stderr=subprocess.STDOUT)
     time.sleep(5)
     for m in OLLAMA_MODELS:
-        sh(f"ollama pull {{m}}")
+        sh(f"ollama pull {{m}}", tries=3)
     sh("ollama list")
 print("setup done")
 '''
