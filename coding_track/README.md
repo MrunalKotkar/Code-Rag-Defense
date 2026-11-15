@@ -125,6 +125,10 @@ Week 2 decisions (and why):
   ODEX scoring runs **all** test cases (ODEX's script samples one); a full-function answer
   is used as is, otherwise it is treated as a completion (prompt + answer + suffix).
 * **DS-1000** scoring copies DS-1000's test_ds1000.py program and its 120 s time limit.
+  71 DS-1000 problems (14 of our 199 scored) ask for the indented *body* of a function
+  (`def f(...):` + `### BEGIN SOLUTION`); an answer that writes a whole program fails there
+  with an IndentationError. This is kept as is: DS-1000 scores its own published chat-model
+  answers the same way (its GPT-4 answer to problem 995 has the same failure).
   **BigCodeBench** uses its official evaluator (`bigcodebench.evaluate`, local, calibrated).
 * **Scored set:** test-split questions using an attacked or control library (364:
   DS-1000 199, BigCodeBench 148, ODEX 17). The optional **anchor** run (Llama 3.1 8B,
