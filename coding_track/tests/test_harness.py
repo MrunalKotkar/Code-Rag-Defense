@@ -35,6 +35,16 @@ def test_odex_bare_expression_answer_becomes_completion():
     assert odex_program(ODEX_ROW, "3").startswith("def f_1():\n    return 3")
 
 
+def test_odex_answer_with_its_own_return_is_the_function_body():
+    assert odex_program(ODEX_ROW, "return 3\n").startswith("def f_1():\n    return 3\n")
+    body = "import math\nx = math.floor(3.5)\nreturn x\n"
+    prog = odex_program(ODEX_ROW, body)
+    assert prog.startswith("def f_1():\n    import math\n    x = math.floor(3.5)\n    return x\n")
+    exec(prog, {})                                                       # runs and passes
+    # a reference solution is always a completion
+    assert odex_program(ODEX_ROW, "3", is_reference=True).startswith("def f_1():\n    return 3")
+
+
 def test_defines_function():
     assert defines_function("def f_1(a):\n  return a", "f_1")
     assert not defines_function("def g():\n  pass", "f_1")

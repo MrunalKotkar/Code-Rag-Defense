@@ -188,6 +188,10 @@ Run the setup cell first in every session. Every run resumes where it stopped.
              "!python -m coding_track.steps.w2_openai_batch status --setting clean_rag"),
         code("!python -m coding_track.steps.w2_openai_batch collect --setting no_retrieval\n"
              "!python -m coding_track.steps.w2_openai_batch collect --setting clean_rag"),
+        md("## Re-read saved answers with the current answer reader  \n"
+           "Run after the answer reader changed (it never calls a model). "
+           "Never while a generation or collect cell is running."),
+        code("!python -m coding_track.steps.w2_reread_answers"),
         md("## Day 6 - Export all answers for the test notebook"),
         code("!python -m coding_track.steps.w2_export_for_tests\n"
              "from google.colab import files\n"

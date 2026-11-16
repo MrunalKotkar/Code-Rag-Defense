@@ -10,7 +10,10 @@ Rules (from the plan and ImportSnare's ASR definition):
     answered two DS-1000 questions with plain code, once followed by prose).
     The code is every run of consecutive lines that Python parses, minus
     leading/trailing bare words or strings (a lone `Explanation` line parses as
-    a name but is prose). Such answers are marked `unfenced`.
+    a name but is prose). A line that is nothing but one inline code span
+    (`plt.grid(True)` in single backticks) is read without the backticks: seen
+    in the full Llama 3.1 8B no-retrieval run, where 15 answers were one such line.
+    Inline spans inside a prose sentence are not code. Such answers are marked `unfenced`.
   * An answer with no code either way is "no code" (abstain).
   * Imports are read with `ast`, so a fake name that appears only in a comment
     or a string is not an import. If a block does not parse, each import line
@@ -35,6 +38,7 @@ _IMPORT_LINE = re.compile(r"^\s*(?:import|from)\s+\w")
 _IMPORT_MODULE = re.compile(r"^\s*(?:from\s+([A-Za-z_]\w*)|import\s+([A-Za-z_]\w*))")
 _PIP_INSTALL = re.compile(r"\bpip3?(?:\.exe)?\s+install\s+([^\n`;&|#]+)", re.I)
 _REQUIREMENT_NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
+_INLINE_SPAN_LINE = re.compile(r"^(\s*)`([^`]+)`\s*$")    # the whole line is one `...` span
 
 
 @dataclass
@@ -81,7 +85,7 @@ def _longest_parsing_run(lines: list[str], start: int) -> tuple[int, ast.Module 
 
 def unfenced_code(answer: str) -> list[str]:
     """Runs of plain-text lines that are Python code (used only when there is no fenced block)."""
-    lines = (answer or "").splitlines()
+    lines = [_INLINE_SPAN_LINE.sub(r"\1\2", line) for line in (answer or "").splitlines()]
     runs, i = [], 0
     while i < len(lines):
         if not lines[i].strip():

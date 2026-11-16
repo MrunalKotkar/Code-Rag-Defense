@@ -98,6 +98,7 @@ steps/w2_freeze_retrieval.py   top-40 chunks per scored question, frozen to a fi
 steps/w2_build_prompts.py      every prompt built once (no_retrieval, clean_rag)
 steps/w2_generate_ollama.py    one local model at a time (temp 0, seed 100, num_ctx 16384)
 steps/w2_openai_batch.py       GPT-5.4 mini: probe, submit, status, collect (Batch API)
+steps/w2_reread_answers.py     re-read saved raw answers after a reader fix (no model calls)
 steps/w2_export_for_tests.py   answers -> test notebook
 steps/w2_score.py              baseline table + the three pre-Week-3 checks
 steps/w2_handcheck.py          50 random answers for a manual check
@@ -119,11 +120,17 @@ Week 2 decisions (and why):
 * **Unfenced code counts as code.** In the pilot, Llama 3.1 8B answered 2 of 20 questions
   with plain code and no ``` fence. With no fenced Python block, the reader takes the runs of
   lines that Python parses (bare words/strings at their edges dropped) and marks the record
-  `code_unfenced`; the generation summary prints `code_found_unfenced`.
+  `code_unfenced`; the generation summary prints `code_found_unfenced`. A line that is only one
+  inline code span (`` `plt.grid(True)` ``) is read without its backticks: in the full Llama 3.1 8B
+  no-retrieval run, 15 of 16 "no code" answers were one such line (the 16th was "I don't know").
+  Inline spans inside prose are not code. Raw answers are always saved, so after a reader change
+  `steps/w2_reread_answers.py` recomputes every read field without calling a model.
 * **BigCodeBench Instruct split.** ImportSnare does not say which split it used.
 * **ODEX prompt** follows ODEX's own nl2code format (header, intent docstring, body prefix).
   ODEX scoring runs **all** test cases (ODEX's script samples one); a full-function answer
-  is used as is, otherwise it is treated as a completion (prompt + answer + suffix).
+  is used as is; statements with their own top-level `return` (e.g. `return list(a)`) are the
+  function body (345 of 439 ODEX prompts end in `return `, so appending would give
+  `return return ...`); otherwise the answer is treated as a completion (prompt + answer + suffix).
 * **DS-1000** scoring copies DS-1000's test_ds1000.py program and its 120 s time limit.
   71 DS-1000 problems (14 of our 199 scored) ask for the indented *body* of a function
   (`def f(...):` + `### BEGIN SOLUTION`); an answer that writes a whole program fails there

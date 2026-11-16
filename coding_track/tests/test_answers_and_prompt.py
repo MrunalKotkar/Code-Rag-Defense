@@ -87,6 +87,21 @@ def test_prose_only_and_i_dont_know_are_abstain():
         assert r.abstained and not r.unfenced
 
 
+# --- one inline code span as the whole line (real full-run no-retrieval answers) ---
+def test_answer_that_is_one_inline_span_is_code():
+    r = read_answer("`plt.plot(x, y, marker='+', markersize=7)`")       # ds1000:526
+    assert r.unfenced and r.code == "plt.plot(x, y, marker='+', markersize=7)\n"
+    r = read_answer("`import matplotlib.pyplot as plt; plt.rcParams['font.family'] = 'Arial'`")
+    assert r.imports == ["matplotlib"]                                   # odex:10960463_0
+    assert read_answer("`return list(a)`").code == "return list(a)\n"   # odex:5183533_0
+
+
+def test_inline_span_inside_prose_or_not_code_is_not_code():
+    assert read_answer("Use `plt.grid(True)` to show the grid.").abstained
+    assert read_answer("`I don't know`").abstained
+    assert read_answer("`pandas_v2`").abstained                          # a bare name
+
+
 def test_fenced_block_wins_over_unfenced_text():
     r = read_answer("x = 1\n```python\ny = 2\n```")
     assert r.code == "y = 2\n" and not r.unfenced

@@ -11,6 +11,10 @@ Hugging Face at the same pinned revisions as the main pipeline.
                   * all test cases are run (ODEX's script samples one at random);
                   * a chat model usually writes the whole function, so if the
                     answer defines the entry-point function it is used as is;
+                    if it is statements with their own top-level `return`
+                    (e.g. `return list(a)`), it is the function body (header +
+                    the answer indented; appending it after the prompt's
+                    `return ` would give `return return ...`);
                     otherwise it is treated as a completion (prompt + answer + suffix),
                     which is also how reference solutions are run.
   BigCodeBench  scored by the official evaluator (bigcodebench.evaluate, local
@@ -25,6 +29,7 @@ import os
 import signal
 import subprocess
 import tempfile
+import textwrap
 import threading
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -73,10 +78,23 @@ def defines_function(code: str, name: str) -> bool:
                for n in ast.walk(tree))
 
 
+def returns_at_top_level(code: str) -> bool:
+    """True if the code parses and has a `return` outside any function (a function body)."""
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return False
+    return any(isinstance(n, ast.Return) for n in tree.body)
+
+
 def odex_program(problem: dict, solution: str, is_reference: bool = False) -> str:
     entry = problem["entry_point"]
-    if not is_reference and defines_function(solution.replace("\t", "    "), entry):
+    code = solution.replace("\t", " " * 4)
+    if not is_reference and defines_function(code, entry):
         body = solution
+    elif not is_reference and returns_at_top_level(code):
+        header = problem["prompt"].split("\n")[0]          # "def f_<id>(<args>):"
+        body = header + "\n" + textwrap.indent(code, " " * 4)
     else:
         body = f"{problem['prompt']}{solution}{problem['suffix']}"
     check = "\n".join([problem["test_start"], "".join(problem["test"]), "", f"check({entry})"])

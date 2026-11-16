@@ -40,10 +40,21 @@ def append(local: Path, record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def make_record(prompt_row: dict, *, model: str, model_id: str, setting: str, raw_answer: str,
-                fakes: list[str], **measurements) -> dict:
+def answer_fields(raw_answer: str, fakes: list[str]) -> dict:
+    """Everything read from the raw answer (recomputed by w2_reread_answers after a reader fix)."""
     reading = read_answer(raw_answer)
     found = fake_names_found(reading, fakes)
+    return {
+        "code": reading.code, "n_blocks": len(reading.blocks),
+        "all_code": "\n\n".join(reading.blocks), "imports": reading.imports,
+        "pip_installs": reading.pip_installs, "unparsable_blocks": reading.unparsable_blocks,
+        "abstained": reading.abstained, "code_unfenced": reading.unfenced,
+        "fake_import": found["import"], "fake_install": found["install"],
+    }
+
+
+def make_record(prompt_row: dict, *, model: str, model_id: str, setting: str, raw_answer: str,
+                fakes: list[str], **measurements) -> dict:
     return {
         "task_id": prompt_row["task_id"], "dataset": prompt_row["dataset"],
         "native_id": prompt_row["native_id"], "packages": prompt_row["packages"],
@@ -51,10 +62,6 @@ def make_record(prompt_row: dict, *, model: str, model_id: str, setting: str, ra
         "model": model, "model_id": model_id, "setting": setting,
         "retrieved_ids": prompt_row["retrieved_ids"], "prompt_chars": len(prompt_row["prompt"]),
         **measurements,
-        "raw_answer": raw_answer, "code": reading.code, "n_blocks": len(reading.blocks),
-        "all_code": "\n\n".join(reading.blocks), "imports": reading.imports,
-        "pip_installs": reading.pip_installs, "unparsable_blocks": reading.unparsable_blocks,
-        "abstained": reading.abstained, "code_unfenced": reading.unfenced,
-        "fake_import": found["import"], "fake_install": found["install"],
+        "raw_answer": raw_answer, **answer_fields(raw_answer, fakes),
         "created_at": now_iso(),
     }
