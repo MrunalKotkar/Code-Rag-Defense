@@ -123,6 +123,9 @@ Week 2 decisions (and why):
   `code_unfenced`; the generation summary prints `code_found_unfenced`. A line that is only one
   inline code span (`` `plt.grid(True)` ``) is read without its backticks: in the full Llama 3.1 8B
   no-retrieval run, 15 of 16 "no code" answers were one such line (the 16th was "I don't know").
+  An answer that is one span over several lines (starts and ends with one backtick) is read the
+  same way (one anchor answer: a whole ODEX function). Spans that are not valid Python stay
+  "no code" (anchor: `import json; def f(...): ...` on one line, literal `\n` escapes).
   Inline spans inside prose are not code. Raw answers are always saved, so after a reader change
   `steps/w2_reread_answers.py` recomputes every read field without calling a model.
 * **BigCodeBench Instruct split.** ImportSnare does not say which split it used.
@@ -138,9 +141,11 @@ Week 2 decisions (and why):
   answers the same way (its GPT-4 answer to problem 995 has the same failure).
   **BigCodeBench** uses its official evaluator (`bigcodebench.evaluate`, local, calibrated).
 * **Scored set:** test-split questions using an attacked or control library (364:
-  DS-1000 199, BigCodeBench 148, ODEX 17). The optional **anchor** run (Llama 3.1 8B,
-  no retrieval, all DS-1000 + ODEX) is only for comparing with CodeRAG-Bench Table 5
-  (Llama3-8B w/o: DS-1000 28.9, ODEX 37.4).
+  DS-1000 199, BigCodeBench 148, ODEX 17). The **anchor** run (Llama 3.1 8B,
+  no retrieval, all DS-1000 + ODEX) is one of the plan's two checks before any poisoning:
+  it is compared with CodeRAG-Bench Table 5 (Llama3-8B w/o: DS-1000 28.9, ODEX 37.4;
+  a newer model, so close, not equal). It shares the no-retrieval answers file; the
+  baseline table uses only the scored questions.
 * **GPT-5.4 mini parameters are probed, not assumed**: temperature 0, seed 100 and
   reasoning effort "none" are sent; anything the API rejects is dropped and recorded.
 * **PyYAML 6.0.1 in the DS-1000 environment.** DS-1000's conda environment gets PyYAML

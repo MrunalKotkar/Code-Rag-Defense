@@ -96,6 +96,20 @@ def test_answer_that_is_one_inline_span_is_code():
     assert read_answer("`return list(a)`").code == "return list(a)\n"   # odex:5183533_0
 
 
+def test_answer_that_is_one_span_over_several_lines_is_code():
+    answer = ('`def f_19339(original): \n    """unzip list `original` and return a generator\n'
+              '    """\n    return (x for pair in original for x in pair)`')     # odex:19339_2 (anchor)
+    r = read_answer(answer)
+    assert r.unfenced and r.code == answer[1:-1] + "\n"
+
+
+def test_span_that_is_not_valid_python_stays_no_code():
+    # real anchor answers: `import x; def ...` and literal \n escapes are not Python
+    assert read_answer("`import json; def f_8740353(unescaped): return json.loads(unescaped)`").abstained
+    assert read_answer("`def f_1():\\n    return 'x'`").abstained
+    assert read_answer("`a` and `b`").abstained
+
+
 def test_inline_span_inside_prose_or_not_code_is_not_code():
     assert read_answer("Use `plt.grid(True)` to show the grid.").abstained
     assert read_answer("`I don't know`").abstained

@@ -171,8 +171,9 @@ Run the setup cell first in every session. Every run resumes where it stopped.
         md("## Days 5-6 - Full clean runs, one model at a time (order: Llama 3.1 8B, Qwen2.5-Coder 7B, "
            "Llama 3.2 3B)  \nIf the session drops: run setup, then the same cell; finished questions are skipped."),
         code(f"{gen} --model llama3.1:8b --setting no_retrieval\n{gen} --model llama3.1:8b --setting clean_rag"),
-        md("Optional anchor run (compare with CodeRAG-Bench's published no-retrieval numbers on the full "
-           "DS-1000 and ODEX): "),
+        md("Anchor run, required check before any poisoning (plan): Llama 3.1 8B, no retrieval, every "
+           "DS-1000 and ODEX question, compared with CodeRAG-Bench Table 5 (DS-1000 28.9, ODEX 37.4). "
+           "Run it after the scored no-retrieval run; answers already made are reused."),
         code(f"{gen} --model llama3.1:8b --setting no_retrieval --question-set anchor"),
         code(f"{gen} --model qwen2.5-coder:7b --setting no_retrieval\n"
              f"{gen} --model qwen2.5-coder:7b --setting clean_rag"),
